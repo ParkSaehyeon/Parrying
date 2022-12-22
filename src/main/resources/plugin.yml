@@ -1,0 +1,6 @@
+name: Parrying
+version: '${project.version}'
+main: me.saehyeon.parrying.main.Main
+api-version: 1.17
+authors: [ Saehyeon ]
+description: 마인크래프트에 페링을 추가하는 플러그인
