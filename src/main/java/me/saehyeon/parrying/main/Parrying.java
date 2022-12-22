@@ -1,25 +1,44 @@
 package me.saehyeon.parrying.main;
 
-import org.bukkit.Location;
-import org.bukkit.Particle;
+import org.bukkit.*;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class Parrying {
 
-    public static final float SCAN_RANGE = 1;
-    public static final float MAX_PARRYING_REACH = 4;
+    // 페링 시도 쿨타임인 플레이어 배열
+    ArrayList<Player> tryCoolTime = new ArrayList<>();
 
-    /*
-        반경 내의
-     */
+    // 페링 쿨타임 (초)
+    public static final Long TRY_COOLTIME = 1L;
+
+    // 검사할 위치에서 화살을 인식할 반경
+    public static final float SCAN_RANGE = 1;
+
+    // 페링할 화살을 찾는 최대 거리
+    public static final float MAX_PARRYING_REACH = 2;
+
+    // 페링할 화살을 찾는 반복문에서의 증가폭
     public static final float PARRYING_CHECK_SENSITIVITY = 0.5f;
 
+    // 페링 시의 반동 (뒤로 밀려남)
+    public static final float RECOIL = -0.5f;
+
     public void tryParrying(Player player) {
+
+        // 페링 확인 쿨타임 상태라면 페링이 되지 않음.
+        if(tryCoolTime.contains(player))
+            return;
+
+        // 페링 시도 쿨타임 해제
+        Bukkit.getScheduler().runTaskLater(Main.instance, () -> tryCoolTime.remove(player), TRY_COOLTIME*20);
 
         // 페링 대상이 되는 화살들
         ArrayList<Entity> arrows = getArrows(player);
@@ -30,11 +49,25 @@ public class Parrying {
         // 플레이어가 보고 있지 않은 곳에 있는 화살 제거
         arrows.removeIf(e -> !checkRightArrow(e,player));
 
+        // 가속도가 붙지 않은 화살 제거
+        arrows.removeIf(Entity::isOnGround);
+
         // 화살 페링
         for(Entity arrow : arrows) {
 
-            // 화살의 가속도를 반대로
-            arrow.setVelocity(arrow.getVelocity().multiply(-0.7));
+            // 화살의 가속도 설정
+            arrow.setVelocity(player.getLocation().getDirection());
+
+            // 페링 반동
+            player.setVelocity(player.getLocation().getDirection().multiply(RECOIL));
+
+            // 효과음
+            player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_LAND, SoundCategory.MASTER, 1,2);
+
+            // 파티클 소환
+            Location particleLoc = player.getEyeLocation().clone().add(player.getLocation().getDirection().normalize());
+            player.getWorld().spawnParticle(Particle.BLOCK_CRACK, particleLoc,3, getWeaponMaterial(player.getInventory().getItemInMainHand()).createBlockData());
+
 
         }
     }
@@ -63,6 +96,31 @@ public class Parrying {
 
         return arrows;
 
+    }
+
+    /**
+     * 들고 있는 아이템의 종류에 따라 Block Crack 파티클 소환을 위한 Material를 반환합니다.
+     * 예를들어, 다이아몬드 검이라면 다이아몬드 블럭 Material를 반환합니다.
+     */
+    Material getWeaponMaterial(ItemStack itemstack) {
+        String typeStr = itemstack.getType().toString().toLowerCase();
+
+        if(typeStr.contains("diamond"))
+            return Material.DIAMOND_BLOCK;
+
+        if(typeStr.contains("iron"))
+            return Material.IRON_BLOCK;
+
+        if(typeStr.contains("golden"))
+            return Material.GOLD_BLOCK;
+
+        if(typeStr.contains("netherite"))
+            return Material.NETHERITE_BLOCK;
+
+        if(typeStr.contains("wooden"))
+            return Material.OAK_LOG;
+
+        return Material.ANVIL;
     }
 
     /**
